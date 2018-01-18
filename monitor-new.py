@@ -96,7 +96,7 @@ class AOMModule:
         sendAlertEmail(msgText, self)
     
     def setErrorStatusA( ):
-        msgText = 'Module ' + self.description + ' needs attention due to error type A. /n' + ''
+        msgText = 'Module ' + self.description + ' needs attention due to error type A. \n' + ''
         print(msgText)
         sendAlertEmail(msgText, self)
         
