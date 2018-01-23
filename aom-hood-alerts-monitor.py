@@ -40,7 +40,7 @@ for name in parModules:
     moduleList.append(ast.literal_eval(parModules[name]))
 ##import RPi.GPIO as gpio
 
-import aom-hood-alerts-emails as emails
+import aom-hood-alerts-emails
 
 def dateNow(): 
     return datetime.datetime.now().strftime("%m-%d-%Y %H:%M:%S");
