@@ -14,11 +14,9 @@ log_format = '%(Levelname)s | %(acstime)-15s |%(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG)
 ##import json
 
-
 cfg = configparser.RawConfigParser()
 cfg.read('ClientParameters-new.cfg')       # Read file
 
-#print cfg.getboolean('Settings','bla') # Manual Way to acess them
 try:
     par=dict(cfg.items("Settings"))
 except configparser.NoSectionError:
@@ -149,7 +147,7 @@ class AOMModule:
     
 md=moduleList[0]
 #for m in moduleList:
-oModule=AOMModule.getInstance(md['id'], md['descr'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
+oModule=AOMModule.getInstance(md['id'], md['description'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
 oModule.start()
 
 ##AOM connector port
