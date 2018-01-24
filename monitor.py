@@ -9,6 +9,8 @@ import configparser
 import logging
 import ast
 import threading #import this library so that modules can run in parallel
+import gpiozero #as gpio
+from gpiozero import Button 
 
 log_format = '%(Levelname)s | %(acstime)-15s |%(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG)
@@ -44,12 +46,10 @@ import emails
 def dateNow(): 
     return datetime.datetime.now().strftime("%m-%d-%Y %H:%M:%S");
 
-
-
 ##localData = threading.local
 ##localData.Modules = dict()
 
-class AOMModule:
+class AOMModule(threading.Thread):
     POWER_SWITCH = 'Power Switch'
     POWER_ON = 'Power On'
     POWER_OFF = 'Power Off'
@@ -65,6 +65,7 @@ class AOMModule:
             raise CANNOT_INITIALIZE         
       
     def __init__ (self, id: int, descr: str, gpioPowerUp: int, gpioFaultA: int, gpioFaultB: int):
+        threading.Thread.__init__(self)
         self.id = id
         self.descr = descr
         self.gpioPowerUp = gpioPowerUp
@@ -79,9 +80,11 @@ class AOMModule:
         self.initialized = dateNow()
         self.status = {} ## {status: 'initialized', date: dateNow(), module: self.descr, gpio: ''}
         self.statusLog = []
-
-    def start(self):
+        self.deamon = True
+        self.start()
         self.__initializeGPIO()
+    # def startModule(self):
+    #     self.__initializeGPIO()
     def getGpioDesc(self,gpioId):
         return { FAULT_A : self.gpioFaultA,
                  FAULT_B : self.gpioFaultB,
@@ -89,36 +92,46 @@ class AOMModule:
     def __newStatus(self,statusText, gpioId):      
         self.status = {status: statusText, date: dateNow(), module: self.descr, gpio: getGpioDesc(gpioId)}
         self.statusLog.append(self.status)
-        
     def __initializeGPIO(self):
         msgText = 'Initializing error monitor for module ' + self.descr 
         print(msgText)
 
-        import RPi.GPIO as gpio
-        gpio.setmode(gpio.BCM)
-        gpio.setup(self.gpioPowerUp, gpio.IN, pull_up_down = gpio.PUD_OFF)
-        gpio.setup(self.gpioFaultA, gpio.IN, pull_up_down = gpio.PUD_UP)
-        gpio.setup(self.gpioFaultB, gpio.IN, pull_up_down = gpio.PUD_UP)
-                
-        self.gpioPowerStatus = gpio.input(self.gpioPowerUp)
-        gpio.add_interrupt_callback(self.gpioPowerUp, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
+        ##import RPi.GPIO as gpio
+        ##gpio.setmode(gpio.BCM)
+        ##gpio.setup(self.gpioPowerUp, gpio.IN, pull_up_down = gpio.PUD_OFF)
+        ##gpio.setup(self.gpioFaultA, gpio.IN, pull_up_down = gpio.PUD_UP)
+        ##gpio.setup(self.gpioFaultB, gpio.IN, pull_up_down = gpio.PUD_UP)
+
+        swPowerUp = Button(self.gpioPowerUp)
+        swFaultA = Button(self.gpioFaultA)
+        swFaultB = Button(self.gpioFaultB)
+        ##self.gpioPowerStatus = gpio.input(self.gpioPowerUp)
+        self.gpioPowerStatus = swPowerUp.value
+        ##gpio.add_interrupt_callback(self.gpioPowerUp, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
         
         self.__newStatus('initialized', self.gpioPowerUp)
         if self.gpioPowerStatus == self.gpioPowerAlertStatus:
             __setPowerOn()
         else:
             __setPowerOff()
+        swPowerUp.when_activated = self.gpioCallback
+        swPowerUp.when_deactivated = self.gpioCallback
+
         return
     def __setPowerOff(self):
-        gpio.del_interrupt_calback(self.gpioFaultA)
-        gpio.del_interrupt_calback(self.gpioFaultB)
+        swFaultA.when_activated=None
+        swFaultB.when_activated=None
+        # gpio.del_interrupt_calback(self.gpioFaultA)
+        # gpio.del_interrupt_calback(self.gpioFaultB)
         msgText = 'Power is OFF for module ' + self.descr + '. Switching OFF the error monitor'
         print(msgText)
         emails.sendAlertEmail(msgText, self.descr)
         
     def __setPowerOn(self):
-        gpio.add_interrupt_callback(self.gpioFaultA, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
-        gpio.add_interrupt_callback(self.gpioFaultB, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
+        swFaultA.when_activated=gpioCallback # self.__setErrorStatusA
+        swFaultB.when_activated=gpioCallback # self.__setErrorStatusB        
+        # gpio.add_interrupt_callback(self.gpioFaultA, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
+        # gpio.add_interrupt_callback(self.gpioFaultB, self.gpioCallback, threaded_callback=True, debounce_timeout_ms=100)
         msgText = 'Power is ON for module ' + self.descr + '. Error monitor is now ON'
         print(msgText)
         emails.sendAlertEmail(msgText, self.descr)
@@ -129,9 +142,10 @@ class AOMModule:
         emails.sendAlertEmail(msgText, self.descr)
 
             
-    def __gpioCallback(self,gpioId, value):
-        if gpioId == self.gpioPowerUp:
-            self.gpioPowerStatus = value
+    def gpioCallback(self,iSwitch:Button):
+    # def __gpioCallback(self,gpioId, value):
+        if iSwitch.value == self.gpioPowerUp:
+            self.gpioPowerStatus = iSwitch.value
             if self.gpioPowerStatus == self.gpioPowerAlertStatus:
                 __setPowerOn( )
             else:
@@ -145,10 +159,17 @@ class AOMModule:
             
         return;
     
-md=moduleList[0]
-#for m in moduleList:
-oModule=AOMModule.getInstance(md['id'], md['description'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
-oModule.start()
+# md=moduleList[0]
+
+''' def initializeModule(m):
+    oModule=AOMModule.getInstance(m['id'], m['description'], m['gpioPowerUp'], m['gpioFaultA'], m['gpioFaultB'])    
+    oModule.start() '''
+
+for md in moduleList:
+    oModule=AOMModule.getInstance(md['id'], md['description'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
+    # oModule.start()
+    # threading._start_new_thread = initializeModule(md)
+    # threading._start_new_thread = initializeModule(md)
 
 ##AOM connector port
 # gpioPort  = 16
@@ -156,12 +177,12 @@ oModule.start()
 
 ##gpio.setup(gpioPort, gpio.IN, pull_up_down = gpio.PUD_UP)
 
-dtnow = dateNow()
+# dtnow = dateNow()
 print ('AOM Rangehood alerts application now loaded '  + dtnow )
 
 
     
-while True:
+''' while True:
     input_value = gpio.input(gpioPort)
     if input_value == False:
 
@@ -179,3 +200,4 @@ while True:
 while input_value == False:
             input_value = gpio.input(gpioPort)
             
+ '''
