@@ -22,7 +22,7 @@ import ast
 ##_ = translate.gettext #This is the translator module
 
 cfg = configparser.RawConfigParser()
-cfg.read('ClientParameters.cfg')       # Read file
+cfg.read('ClientParameters-new.cfg')       # Read file
 
 #print cfg.getboolean('Settings','bla') # Manual Way to acess them
 
@@ -40,7 +40,7 @@ for name in parModules:
     moduleList.append(ast.literal_eval(parModules[name]))
 ##import RPi.GPIO as gpio
 
-import aom-hood-alerts-emails as emails
+import emails as emails
 
 def dateNow(): 
     return datetime.datetime.now().strftime("%m-%d-%Y %H:%M:%S");
@@ -133,7 +133,7 @@ class AOMModule:
         print(msgText)
 
         import RPi.GPIO as gpio
-        
+        gpio.setmode(gpio.BCM)
         gpio.setup(self.gpioPowerUp, gpio.IN, pull_up_down = gpio.PUD_OFF)
         gpio.setup(self.gpioFaultA, gpio.IN, pull_up_down = gpio.PUD_UP)
         gpio.setup(self.gpioFaultB, gpio.IN, pull_up_down = gpio.PUD_UP)
@@ -185,7 +185,7 @@ class AOMModule:
     
 md=moduleList[0]
 #for m in moduleList:
-oModule=AOMModule.getInstance(md['id'], md['descr'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
+oModule=AOMModule.getInstance(md['id'], md['description'], md['gpioPowerUp'], md['gpioFaultA'], md['gpioFaultB'])    
 oModule.start()
 
 ##AOM connector port
